@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { ApiError } from "./api-error";
 import { IFetchApiService } from "./fetch-api-service.interface";
+import { IApiError } from "./api-error.interface";
 
 const API_URL = 'https://localhost:4000/'
 
@@ -11,32 +12,44 @@ type TRequestOptions<TMethod extends RequestMehtod> = Omit<RequestInit, 'method'
 @injectable()
 export class FetchApiService implements IFetchApiService{
 
-    private createRequestOptions<TRequestMethod extends RequestMehtod>(method: TRequestMethod, requestOptions?: Omit<TRequestOptions<TRequestMethod>, 'method'>) {
+    private createRequestOptions<TRequestMethod extends RequestMehtod>(
+        method: TRequestMethod, 
+        requestOptions?: Omit<TRequestOptions<TRequestMethod>, 'method'>
+    ) {
         return Object.assign({}, requestOptions ?? {}, {method});
     }
 
-    private async handleRequest<TMethod extends RequestMehtod>(path: string, requestOptions?: TRequestOptions<TMethod>) {
+    private async parseResponse<TResData>(response: Response) {
+        switch(response.headers.get('Content-Type')) {
+            case 'application/json':
+                return response.json() as TResData;
+            case 'text/plain':
+            default:
+                return response.text() as TResData;
+        }
+    }
+
+    private async handleRequest<TResData, TMethod extends RequestMehtod>(path: string, requestOptions?: TRequestOptions<TMethod>) {
         const res = await fetch(`${API_URL}${path}`, requestOptions);
-        const responseError = res.ok ? undefined : new ApiError(res.status, res.statusText);
-
-        // eliminate try-catching multiple errors !!
-        // you must destruct out the error and response --> [apiError, response]
-        return [responseError, res] satisfies [ApiError | undefined, Response]
+        if (res.ok) {
+            return [undefined, await this.parseResponse<TResData>(res)] satisfies [undefined, TResData];
+        }
+        return [new ApiError(res.status, res.statusText), undefined] satisfies [IApiError, undefined];
     }
 
-    async get(path: string, requestOptions?: TRequestOptions<'GET'>) {
-        return this.handleRequest(path, this.createRequestOptions('GET', requestOptions))
+    async get<TResData>(path: string, requestOptions?: TRequestOptions<'GET'>) {
+        return this.handleRequest<TResData, 'GET'>(path, this.createRequestOptions('GET', requestOptions))
     }
 
-    async post(path:string, requestOptions?: TRequestOptions<'POST'>) {
-        return this.handleRequest(path, this.createRequestOptions('POST', requestOptions))
+    async post<TResData>(path:string, requestOptions?: TRequestOptions<'POST'>) {
+        return this.handleRequest<TResData, 'POST'>(path, this.createRequestOptions('POST', requestOptions))
     }
 
-    async put(path: string, requestOptions?: TRequestOptions<'PUT'>) {
-        return this.handleRequest(path, this.createRequestOptions('PUT', requestOptions))
+    async put<TResData>(path: string, requestOptions?: TRequestOptions<'PUT'>) {
+        return this.handleRequest<TResData, 'PUT'>(path, this.createRequestOptions('PUT', requestOptions))
     }
 
-    async delete(path: string, requestOptions?: TRequestOptions<'DELETE'>) {
-        return this.handleRequest(path, this.createRequestOptions('DELETE', requestOptions))
+    async delete<TResData>(path: string, requestOptions?: TRequestOptions<'DELETE'>) {
+        return this.handleRequest<TResData, 'DELETE'>(path, this.createRequestOptions('DELETE', requestOptions))
     }
 }

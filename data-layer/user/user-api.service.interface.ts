@@ -1,7 +1,7 @@
 import { IApiError } from "@data-layer/shared/api-error.interface";
 import { User } from "domain-layer/user/user.types";
 
-export type ApiServiceResult<TResData> = Promise<[IApiError | SyntaxError, undefined] | [undefined, TResData]>
+export type ApiServiceResult<TResData> = Promise<[IApiError, undefined] | [undefined, TResData]>
 
 export interface IUserApiService {
     registerUser(userProfile: Omit<User, 'id'>): ApiServiceResult<User>;
